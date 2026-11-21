@@ -1,0 +1,15 @@
+# Used by tests/e2e.js. Start the dev server with INNERFACE_CONFIG=tests/e2e.toml.
+[people.zoe]
+email = "zoe@example.com"
+name = "Zoe"
+
+[people.robin]
+email = "robin@example.com"
+name = "Robin"
+
+[projects.main]
+name = "Main"
+givers = ["robin"]
+receivers = ["zoe"]
+repo = "acme/app"
+github_token_env = "E2E_GH_TOKEN"

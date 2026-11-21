@@ -1,0 +1,44 @@
+# No ports are opened on the host. Traffic arrives only through the Cloudflare tunnel.
+# The whole setup is walked through in docs/install.md.
+services:
+  app:
+    # "docker compose pull" fetches this ready-made image. "docker compose up -d --build" builds it from this folder instead.
+    image: ghcr.io/inrface/inrface:latest
+    build: .
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 200
+    mem_limit: 1g
+    # Secrets and settings come from .env. GitHub tokens are named per project in innerface.toml.
+    env_file: [.env]
+    environment:
+      AUTH_MODE: access
+      CF_ACCESS_TEAM: ${CF_ACCESS_TEAM:?Set CF_ACCESS_TEAM in .env. See docs/install.md}
+      CF_ACCESS_AUD: ${CF_ACCESS_AUD:?Set CF_ACCESS_AUD in .env. See docs/install.md}
+      INNERFACE_CONFIG: /config/innerface.toml
+      TUNNEL_TOKEN: ""
+    volumes:
+      - innerface-data:/data
+      - ./innerface.toml:/config/innerface.toml:ro
+    networks: [innerface]
+
+  tunnel:
+    image: cloudflare/cloudflared:2026.11.0
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?Set TUNNEL_TOKEN in .env. See docs/install.md}
+    depends_on: [app]
+    networks: [innerface]
+
+volumes:
+  innerface-data:
+
+networks:
+  innerface:

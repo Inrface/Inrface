@@ -1,0 +1,27 @@
+# Inrface build runner settings. Copy to ~/.config/inrface-runner.toml and run: chmod 600 ~/.config/inrface-runner.toml
+# Everything that decides what runs on this machine is here and nowhere else. Inrface never sets any of it.
+
+repo = "owner/name"                      # the repo build issues are opened in; must match the project's repo in Inrface
+allowed_authors = ["the-token-owner"]    # only issues opened by these GitHub logins are built. Use the login Inrface's GitHub token belongs to
+work_dir = "/home/you/code/app"          # a checkout of the repo; the agent works in a copy of it (see worktrees)
+github_token_file = "~/.config/inrface-runner.github"   # a token that can read and comment on issues. Not the agent's own
+command = ["claude", "-p", "{prompt}", "--allowedTools", "Read,Edit,Write,Glob,Grep,Bash(git status:*),Bash(git add:*),Bash(git commit:*),Bash(git push origin inrface/*),Bash(gh pr create:*),Bash(npm test:*)"]
+# {prompt} is the instructions with the issue text inside; {issue} and {branch} also work. Never run through a shell.
+
+# worktrees = true            # work in a fresh copy on branch inrface/issue-N (recommended; needed to run builds side by side)
+# base_branch = "main"
+# timeout_minutes = 60        # a build still running after this is stopped
+# max_runs_per_day = 20       # a stop on cost, whatever Inrface says
+# stdin = false               # true: send the prompt on the command's standard input instead of {prompt}
+# build_label = "ready-to-build"
+# state_dir = "~/.local/state/inrface-runner"
+
+# Ask Inrface when to check and whether the runner is on (Settings -> Connectors -> Build runner). Leave out to use this file only.
+# inrface_url = "https://app.inrface.com"
+# runner_key = "inrr_..."
+# inrface_headers = { "CF-Access-Client-Id" = "...", "CF-Access-Client-Secret" = "..." }   # a Cloudflare Access service token, if Access is in front
+# interval_minutes = 5        # used when Inrface isn't asked
+
+# Start a check the moment Inrface starts a build. Add a Webhook connector in Inrface that points at this address.
+# listen = "127.0.0.1:8765"
+# webhook_secret = "..."

@@ -1,0 +1,29 @@
+# Try Inrface on your own machine: no Cloudflare, no sign-in, and the made-up people from innerface.example.toml.
+#
+#   docker compose -f docker-compose.try.yml up --build
+#
+# Then open http://localhost:8080. You are Alex, who receives ideas. To be Sam, who gives them, start it with
+# DEV_USER=sam@example.com in front of the command.
+#
+# Never put this on the internet. It trusts anyone who can reach the port, which is why it listens on this
+# machine only. It keeps its own data and doesn't touch a real install in the same folder.
+name: inrface-try
+services:
+  app:
+    image: ghcr.io/inrface/inrface:latest
+    build: .
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      AUTH_MODE: dev
+      DEV_USER: ${DEV_USER:-}
+      INNERFACE_CONFIG: /config/innerface.toml
+    ports: ["127.0.0.1:8080:8080"]
+    volumes:
+      - try-data:/data
+      - ./innerface.example.toml:/config/innerface.toml:ro
+
+volumes:
+  try-data:

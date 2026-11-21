@@ -1,0 +1,31 @@
+name: Something didn't work
+description: A bug, or a step in the setup that failed.
+labels: [bug]
+body:
+  - type: textarea
+    id: did
+    attributes:
+      label: What you did
+      description: The steps, in order. If it was the setup, say which step.
+    validations: {required: true}
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected, and what happened instead
+    validations: {required: true}
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log lines
+      description: From `docker compose logs app`. Remove anything private, such as names, email addresses and tokens.
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The commit (`git rev-parse --short HEAD`) or image tag you're running.
+  - type: dropdown
+    id: how
+    attributes:
+      label: How it's signed in
+      options: ["Cloudflare Access", "The app's own sign-in", "Try-it mode on my own computer", "Not sure"]
