@@ -1,0 +1,51 @@
+# Inrface with its own sign-in, for installs that don't put Cloudflare Access in front. See docs/sign-in.md.
+#
+#   docker compose -f docker-compose.builtin.yml up -d
+#
+# This way of signing in is new and has not had a security review. docker-compose.yml, with Cloudflare Access,
+# is the reviewed one. It is a separate file so that nothing in .env can switch that install's sign-in off.
+# Both files use the same data volume: stop one before starting the other.
+services:
+  app:
+    image: ghcr.io/inrface/inrface:latest
+    build: .
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 200
+    mem_limit: 1g
+    env_file: [.env]
+    environment:
+      AUTH_MODE: builtin
+      # Left over from a Cloudflare Access setup, these would be refused, so they are blanked here.
+      CF_ACCESS_TEAM: ""
+      CF_ACCESS_AUD: ""
+      DEV_USER: ""
+      PUBLIC_URL: ${PUBLIC_URL:?Set PUBLIC_URL in .env. See docs/sign-in.md}
+      INNERFACE_CONFIG: /config/innerface.toml
+      TUNNEL_TOKEN: ""
+    volumes:
+      - innerface-data:/data
+      - ./innerface.toml:/config/innerface.toml:ro
+    networks: [innerface]
+
+  # The tunnel carries https to the app without opening a port. Its address must not have an Access application.
+  tunnel:
+    image: cloudflare/cloudflared:2026.11.0
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?Set TUNNEL_TOKEN in .env. See docs/install.md}
+    depends_on: [app]
+    networks: [innerface]
+
+volumes:
+  innerface-data:
+
+networks:
+  innerface:

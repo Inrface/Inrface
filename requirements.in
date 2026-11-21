@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+pyjwt[crypto]
+anthropic
+openai
+pywebpush
+mcp
+httpx
+markdown

@@ -1,0 +1,27 @@
+name: Feedback on trying it
+description: You set it up, or tried to. Tell us how it went, even if nothing broke.
+labels: [feedback]
+body:
+  - type: dropdown
+    id: far
+    attributes:
+      label: How far did you get?
+      options:
+        - I read the README and stopped
+        - I ran it in try-it mode
+        - I set it up on a server
+        - People are using it with real ideas
+    validations: {required: true}
+  - type: textarea
+    id: friction
+    attributes:
+      label: Where did you get stuck, or lose interest?
+  - type: textarea
+    id: use
+    attributes:
+      label: What would you use it for, and who would give you the ideas?
+      description: A startup team, a client, a community, a family. Whatever is true.
+  - type: textarea
+    id: missing
+    attributes:
+      label: What's missing that would make you use it every week?

@@ -1,0 +1,30 @@
+# Copy to innerface.toml and fill in. It holds names and emails but no secrets.
+# Everyone listed here must also be allowed by your Cloudflare Access policy.
+
+[people.alex]
+email = "alex@example.com"
+name = "Alex"
+
+[people.sam]
+email = "sam@example.com"
+name = "Sam"
+
+# One block per project. Givers bring ideas. Receivers review, scope, file and start builds.
+[projects.main]
+name = "Main product"
+givers = ["sam"]
+receivers = ["alex"]
+
+# Optional: link a GitHub repo so "start build" opens a labeled issue there.
+# The token goes in .env under the name given here. Give it access to this repo only,
+# with read and write on Issues, read on Pull requests and read on Contents.
+repo = "your-org/your-repo"
+github_token_env = "GITHUB_TOKEN_MAIN"
+build_label = "ready-to-build"
+
+# Who can ask their AI app about this repo's code: "everyone" in the project, "receivers" or "off".
+# It can also be changed from the Settings screen.
+code_access = "everyone"
+
+# Optional background for the in-app assistant, when AI_PROVIDER is on.
+context = ""

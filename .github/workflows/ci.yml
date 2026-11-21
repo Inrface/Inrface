@@ -1,0 +1,100 @@
+# Runs the tests on every pull request and push to main.
+# A pull request from this repo that passes is merged automatically, unless it has the
+# "hold" label or is a draft. Only people with write access can open one; a pull request
+# from a fork is tested with a read-only token and never merged here.
+#
+# The merge is a fast-forward: main moves to the tested commits exactly as they were
+# written. GitHub's own merge buttons write a new commit under the account's profile
+# name, and this keeps that name out of the history.
+#
+# Once main has moved, the ready-made image is built from it and pushed to
+# ghcr.io/inrface/inrface, for people who install without building from source.
+name: CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, unlabeled]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt pytest==9.2.0
+      - run: python -m pytest -q
+
+  automerge:
+    needs: test
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.base.ref == 'main' &&
+      !github.event.pull_request.draft &&
+      !contains(github.event.pull_request.labels.*.name, 'hold')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+    steps:
+      - name: Merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          # Refused unless main is an ancestor of the tested commit.
+          if ! gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/heads/main" -f sha="$SHA" -F force=false > /dev/null; then
+            echo "::error::main has moved on. Rebase the branch onto main and push again."
+            exit 1
+          fi
+          # GitHub marks the pull request merged once it sees the commits on main. Wait for
+          # that before removing the branch, or the pull request shows as closed instead.
+          for i in $(seq 1 30); do
+            [ "$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json state -q .state)" = MERGED ] && break
+            sleep 2
+          done
+          gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/refs/heads/$BRANCH"
+
+  image:
+    # A merge made above with the workflow's own token doesn't start a new run, so the image is
+    # built here, in the same run. A direct push to main builds it too.
+    needs: [test, automerge]
+    if: >-
+      always() && needs.test.result == 'success' &&
+      (needs.automerge.result == 'success' ||
+       (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Build and push
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMAGE: ghcr.io/inrface/inrface
+          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          # For 64-bit Arm machines (a Raspberry Pi, a Mac), built under emulation.
+          docker run --privileged --rm tonistiigi/binfmt --install arm64
+          docker buildx create --use
+          docker buildx build --platform linux/amd64,linux/arm64 --push -t "$IMAGE:latest" -t "$IMAGE:$SHA" .
