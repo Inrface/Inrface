@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import importlib.util
 import json
+import os
 import pathlib
 import time
 
@@ -152,6 +153,20 @@ def test_refused_tools_are_found_by_name_only_and_only_for_this_run(tmp_path):
     assert mod.Runner.denied_tools(tmp_path / "missing.log") == []
     (tmp_path / "plain.log").write_text("Done. permission_denials were none\n")
     assert mod.Runner.denied_tools(tmp_path / "plain.log") == []
+
+
+def test_check_names_what_the_runner_user_could_change(tmp_path):
+    conf = tmp_path / "r.toml"
+    conf.write_text("x = 1")
+    got = mod.Runner.writable([conf])
+    assert str(conf) in got and str(tmp_path) in got
+    conf.chmod(0o400)
+    tmp_path.chmod(0o500)
+    try:
+        if os.geteuid() != 0:   # root can write anywhere
+            assert mod.Runner.writable([conf]) == []
+    finally:
+        tmp_path.chmod(0o700)
 
 
 def test_check_runs_each_verify_command_and_says_what_is_wrong(tmp_path, capsys):

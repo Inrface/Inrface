@@ -335,6 +335,17 @@ class Runner:
                     names.append(name[:60])
         return names[:20]
 
+    @staticmethod
+    def writable(paths) -> list[str]:
+        """Which of these files or folders the current user can change. If the agent runs as this user, it can change them too."""
+        out = []
+        for p in paths:
+            p = Path(p)
+            for target in (p, p.parent):
+                if os.access(target, os.W_OK) and str(target) not in out:
+                    out.append(str(target))
+        return out
+
     def check_verify(self) -> int:
         """Run each verify command with the self-test argument, and say if one is missing or fails. Returns the number of problems."""
         problems = 0
@@ -465,7 +476,11 @@ def main() -> int:
             return 1
         print("Inrface:", r.settings() if cfg.get("inrface_url") else "not set, the local file decides")
         print(f"Work dir: {r.work_dir} ({'exists' if r.work_dir.is_dir() else 'MISSING'}). Allowed authors: {', '.join(sorted(r.allowed))}")
-        return 1 if r.check_verify() else 0
+        problems = r.check_verify()
+        open_to_agent = r.writable([path, Path(__file__).resolve()])
+        if open_to_agent:
+            print("Warning: this user can change " + ", ".join(open_to_agent) + ". If your agent runs as this user, it can edit its own allowed tools. See \"Keep the agent from changing its own rules\" in docs/build-runner.md.")
+        return 1 if problems else 0
     if a.once or a.dry_run:
         r.check(dry=a.dry_run)
         for t in list(r.threads):

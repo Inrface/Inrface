@@ -118,7 +118,11 @@ Unit tests passing doesn't show a screen works, and in `claude -p` mode a tool t
 
 The runner can make a skipped check visible; it can't force the agent to do it. Tell the user to read the "Not verified" list in each pull request.
 
-### 6. Run it all the time
+### 6. Keep the agent from changing its own rules
+
+If the agent runs as the same user as the runner and its file tools aren't limited to the worktree, it can edit the runner's config or script and widen its own allowed tools. Ask the user before changing ownership. The setup that works: runner script in a root-owned folder (mode 644); the config in a root-owned place and handed to the service with `LoadCredential=runner.toml:/etc/…` and `--config ${CREDENTIALS_DIRECTORY}/runner.toml` (systemd 247 or later), which gives the service a read-only copy. `--check` warns when the user it runs as can change the config or the script. The full layout, and how to run `--check` under it, is in "Keep the agent from changing its own rules" in docs/build-runner.md. With `PrivateTmp=yes`, the verify script must create its own output folder.
+
+### 7. Run it all the time
 
 A systemd user service (ask the user before installing it):
 
@@ -139,7 +143,7 @@ Then `systemctl --user daemon-reload && systemctl --user enable --now inrface-ru
 
 To stop builds at once without stopping the service, create the file `~/.local/state/inrface-runner/PAUSE`. Delete it to carry on.
 
-### 7. Ask the user to do the Inrface side (if they chose to check in)
+### 8. Ask the user to do the Inrface side (if they chose to check in)
 
 In the Inrface web app: **Settings, Connectors, Build runner**. Make a key and put it in the config as `runner_key` with `inrface_url`, switch the runner on, set the interval, and save. The panel then shows when the runner last checked in. If Cloudflare Access is in front of Inrface, the runner also needs a service token (`inrface_headers`) and an Access policy that lets it in. The user sets that up in Cloudflare.
 

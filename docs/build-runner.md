@@ -81,6 +81,25 @@ Two cautions about the script:
 
 The runner can make a skipped check visible. It can't make the agent do it, so read the **Not verified** list when you review the pull request.
 
+## Keep the agent from changing its own rules
+
+If the agent runs as the same user as the runner, and its file tools aren't limited to its working copy, it can edit the runner's config, the runner script, or a folder holding either. Widening its own `--allowedTools` for the next build is then one edit away. The runner can't stop that from inside, so set the files up so the agent's user can't change them:
+
+- Put the runner script in a folder owned by another user (root), mode 644.
+- Keep the config where that user owns it too, not in the agent user's home folder. Because the config holds secrets and must be mode 600, hand it to the service with systemd credentials (systemd 247 or later). The service gets a read-only copy that only it can read, and edits to it wouldn't last:
+
+  ```ini
+  [Service]
+  User=builder
+  LoadCredential=runner.toml:/etc/inrface-runner/runner.toml
+  ExecStart=/usr/bin/python3 /opt/inrface-runner/inrface_runner.py --config ${CREDENTIALS_DIRECTORY}/runner.toml
+  ```
+
+  To run `--check` by hand the same way: `systemd-run --wait --pipe -p User=builder -p LoadCredential=runner.toml:/etc/inrface-runner/runner.toml python3 -I /opt/inrface-runner/inrface_runner.py --config '$CREDENTIALS_DIRECTORY/runner.toml' --check`.
+- `--check` warns when the user it runs as can change the config, the script, or the folders they are in.
+
+If your service uses `PrivateTmp=yes`, it starts with an empty private `/var/tmp`. A verify script has to create its own output folder, and its screenshots are visible only inside that service.
+
 ## Start a build the moment Inrface asks
 
 Add a **Webhook** connector in Inrface pointing at the runner's address and put `listen` and `webhook_secret` in the file. The runner checks the signature, and then does a normal check right away. It never reads the webhook's contents as instructions. Polling stays as the fallback. Inrface only posts to `https://` addresses and not to private ones, so the address has to be reachable that way, for example through a tunnel, unless you've set `WEBHOOK_ALLOW_PRIVATE`.
