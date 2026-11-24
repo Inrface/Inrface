@@ -121,3 +121,51 @@ def test_the_wake_signature_matches_what_inrface_sends():
     assert not mod.verify("other", webhook.sign("s3cret", int(time.time()), body), body)
     assert not mod.verify("s3cret", webhook.sign("s3cret", int(time.time()) - 900, body), body)
     assert not mod.verify("s3cret", "", body)
+
+
+def test_the_prompt_asks_for_a_verified_account_and_names_the_projects_checks(tmp_path):
+    plain = make(tmp_path).prompt(3, issue(), "inrface/issue-3")
+    assert 'heading "Verified"' in plain and '"Not verified"' in plain and "no check for what a person sees" in plain
+    r = make(tmp_path, verify_commands=["/opt/verify/ui.sh", ["/opt/verify/api.sh", "--fast"]])
+    p = r.prompt(3, issue(), "inrface/issue-3")
+    assert "`/opt/verify/ui.sh`" in p and "`/opt/verify/api.sh --fast`" in p and "no check for what" not in p
+    assert "under verify/" in p and "under verify/" not in plain
+
+
+def test_verify_commands_are_programs_and_never_a_shell_line(tmp_path):
+    with pytest.raises(SystemExit):
+        make(tmp_path, verify_commands="run.sh && rm -rf /")
+    with pytest.raises(SystemExit):
+        make(tmp_path, verify_commands=[["ok.sh", 3]])
+    assert make(tmp_path, verify_commands=["ui.sh"]).verify_cmds == [["ui.sh"]]
+
+
+def test_refused_tools_are_found_by_name_only_and_only_for_this_run(tmp_path):
+    log = tmp_path / "issue-1.log"
+    old = json.dumps({"type": "result", "permission_denials": [{"tool_name": "Bash", "tool_input": {"command": "secret"}}]}) + "\n"
+    log.write_text(old)
+    new = "not json\n" + json.dumps({"type": "result", "permission_denials": [{"tool_name": "Bash", "tool_input": {"command": "node x.js"}}, {"tool_name": "WebFetch"}, {"tool_name": "Bash"}]}) + "\n"
+    log.write_text(old + new)
+    assert mod.Runner.denied_tools(log, len(old)) == ["Bash", "WebFetch"]
+    assert "secret" not in str(mod.Runner.denied_tools(log, len(old)))
+    assert mod.Runner.denied_tools(log, len(old + new)) == []
+    assert mod.Runner.denied_tools(tmp_path / "missing.log") == []
+    (tmp_path / "plain.log").write_text("Done. permission_denials were none\n")
+    assert mod.Runner.denied_tools(tmp_path / "plain.log") == []
+
+
+def test_check_runs_each_verify_command_and_says_what_is_wrong(tmp_path, capsys):
+    good = tmp_path / "good.sh"
+    good.write_text('#!/bin/sh\n[ "$1" = "--self-test" ] && echo "chromium found" && exit 0\nexit 2\n')
+    bad = tmp_path / "bad.sh"
+    bad.write_text("#!/bin/sh\necho no browser >&2\nexit 3\n")
+    for f in (good, bad):
+        f.chmod(0o755)
+    (tmp_path / "app").mkdir()
+    allowed = f"Read,Bash({good}:*)"
+    r = make(tmp_path, verify_commands=[str(good), str(bad), str(tmp_path / "gone.sh")], command=["claude", "-p", "{prompt}", "--allowedTools", allowed])
+    assert r.check_verify() == 3
+    out = capsys.readouterr().out
+    assert "good.sh ok. chromium found" in out and "bad.sh FAILED with 3. no browser" in out and "gone.sh was not found" in out
+    assert str(bad) + " is not in the agent's allowed tools" in out
+    assert make(tmp_path).check_verify() == 0 and "none set" in capsys.readouterr().out

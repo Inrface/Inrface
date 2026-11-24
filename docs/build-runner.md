@@ -53,6 +53,34 @@ Then `systemctl --user enable --now inrface-runner`. To keep it running when you
 
 To stop it at once without stopping the service, create the file `~/.local/state/inrface-runner/PAUSE`. Delete it to carry on.
 
+## Make it try the work, not only test it
+
+Passing unit tests doesn't show that a screen works. By default the agent can only do what its tool list allows, and in `claude -p` mode anything else is refused without a word. So a build can pass its tests and never have been looked at. Three things fix that:
+
+1. **Give the project a check for what a person sees.** Write a script that starts the app on its own (demo data, a temporary folder, no network), drives a page or flow in a headless browser at phone and desktop widths, saves screenshots, and reports console errors and failed requests. Keep it **outside the repository and owned by someone other than the agent**, so the agent can run it but not change it. Have it accept `--self-test`, which only checks that its parts are there (the browser, the folders) and exits 0.
+2. **Tell the runner about it** with `verify_commands`, and allow it in the agent's tool list as an exact entry, not a general shell:
+
+   ```toml
+   verify_commands = ["/opt/verify/ui.sh"]
+   command = ["claude", "-p", "{prompt}", "--output-format", "stream-json", "--verbose",
+              "--allowedTools", "Read,Edit,Write,Glob,Grep,Bash(git add:*),Bash(git commit:*),Bash(git push origin inrface/*),Bash(gh pr create:*),Bash(/opt/verify/ui.sh:*)"]
+   ```
+
+   Each entry is a program path, or a list of arguments. It is never run through a shell.
+3. **Run `--check`.** It runs every verify command with `--self-test`, so a missing browser shows up before a build instead of after, and it warns if a verify command isn't in the agent's allowed tools.
+
+What the runner does with it:
+
+- **The prompt** names those commands and says: done means verified. Run the tests, then the project's check for anything a person sees or uses. In the pull request, put what was checked, with the output or screenshots, under **Verified**, and anything not checked or refused under **Not verified**. Don't call the work complete while anything is under **Not verified**. With no `verify_commands`, the prompt tells the agent to say plainly that nothing could try the work.
+- **Refused tools are shown.** With `--output-format json` or `stream-json`, Claude Code lists the tool calls it refused. The runner reads that list and comments on the issue with the tool **names** (never what they were asked to do). The same flag also keeps the whole stream in `issue-N.log`, so you can read what happened afterwards.
+
+Two cautions about the script:
+
+- **It runs the checkout's own code** (it has to start the app), as the user the agent runs as. That is no more than the test command already does, but it means that user should have no more power than it needs, and the script itself should be owned by someone else so the agent can't edit it.
+- **Isolating the network** (a temporary user and network namespace, for example `unshare -rn`) needs unprivileged user namespaces, which some hosts switch off. If your script relies on it, have `--self-test` check for it, so it fails at `--check` rather than during a build. If your agent's `Read` tool is limited to its working copy, add the folder the screenshots go to.
+
+The runner can make a skipped check visible. It can't make the agent do it, so read the **Not verified** list when you review the pull request.
+
 ## Start a build the moment Inrface asks
 
 Add a **Webhook** connector in Inrface pointing at the runner's address and put `listen` and `webhook_secret` in the file. The runner checks the signature, and then does a normal check right away. It never reads the webhook's contents as instructions. Polling stays as the fallback. Inrface only posts to `https://` addresses and not to private ones, so the address has to be reachable that way, for example through a tunnel, unless you've set `WEBHOOK_ALLOW_PRIVATE`.
@@ -71,6 +99,7 @@ Add a **Webhook** connector in Inrface pointing at the runner's address and put 
 
 ## When something goes wrong
 
+- **The pull request says a screen was never tried.** The agent was probably refused the tool that starts the app or the browser. Look for the runner's "refused" comment on the issue, add the check script to `verify_commands` and to the allowed tools, and run `--check`.
 - **Nothing starts.** Run `--dry-run`. It says why: paused, off in Inrface, no matching issue, or the author isn't allowed. Look at `~/.local/state/inrface-runner/runner.log`.
 - **A build failed.** Its output is in `issue-N.log` in the same folder, and the issue gets a comment. To try again, remove `"N"` from `state.json` while the runner is stopped.
 - **Inrface can't be reached.** The runner keeps the last settings it was given. If it has never reached Inrface, it does nothing.

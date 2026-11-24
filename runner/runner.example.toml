@@ -22,6 +22,12 @@ command = ["claude", "-p", "{prompt}", "--allowedTools", "Read,Edit,Write,Glob,G
 # inrface_headers = { "CF-Access-Client-Id" = "...", "CF-Access-Client-Secret" = "..." }   # a Cloudflare Access service token, if Access is in front
 # interval_minutes = 5        # used when Inrface isn't asked
 
+# Make the agent try the work, not only test it. Scripts you own, outside the repo, that start the app and look at it
+# (see docs/build-runner.md). Each is a program path or a list of arguments, never a shell line. Allow each in the
+# agent's tools above as an exact entry, such as Bash(/opt/verify/ui.sh:*). `--check` runs each with --self-test.
+# verify_commands = ["/opt/verify/ui.sh"]
+# For claude, add "--output-format", "stream-json", "--verbose" to the command so the runner can say which tools were refused.
+
 # Start a check the moment Inrface starts a build. Add a Webhook connector in Inrface that points at this address.
 # listen = "127.0.0.1:8765"
 # webhook_secret = "..."

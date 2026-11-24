@@ -160,7 +160,7 @@ By default a card is done when its GitHub issue closes with the pull request mer
 
 ## Starting builds automatically
 
-A small script, `runner/inrface_runner.py`, can run on the machine that holds your code and pick up each build issue Inrface opens, handing it to your coding agent on its own branch. It's one file with nothing to install. You set when it checks, and switch it on, under **Settings → Connectors → Build runner**. What it runs and which tokens it uses stays in a file on that machine, never in Inrface. It never merges or deploys. Setup is in [docs/build-runner.md](docs/build-runner.md).
+A small script, `runner/inrface_runner.py`, can run on the machine that holds your code and pick up each build issue Inrface opens, handing it to your coding agent on its own branch. It's one file with nothing to install. You set when it checks, and switch it on, under **Settings → Connectors → Build runner**. What it runs and which tokens it uses stays in a file on that machine, never in Inrface. It never merges or deploys. Setup is in [docs/build-runner.md](docs/build-runner.md). A guide written for a coding agent to set it up on your behalf is [docs/build-runner-agent-setup.md](docs/build-runner-agent-setup.md).
 
 ## Ideas from Slack
 
