@@ -23,7 +23,7 @@ A project can have up to 12 connectors, and more than one of the same kind.
 
 ## What happens on Start build
 
-A build starts when a receiver presses **Start build** in the app. An AI app can only ask: the request waits on the idea until a receiver presses the button.
+A build starts when a receiver presses **Start build** in the app. An AI app can only ask: the request waits on the idea until a receiver presses the button. When an AI app asks, the alert on your phone has **Start build** and **Not now** buttons, so you can answer without opening the app. They make the same request the app's own buttons make, so they only work while you're signed in on that phone. If the sign-in has ended, the alert says to open Inrface instead. Tapping the alert itself opens the idea.
 
 1. Inrface sends the scope to each place in turn.
 2. Each place that accepts it is recorded on the card as a link, such as `Issue #12` or `ENG-45`.

@@ -26,7 +26,7 @@ def test_asking_from_an_ai_app_sends_nothing(client, pushes, gh):
     assert r["started"] is False and r["waiting_for_approval"] and r["would_go_to"] == ["GitHub"]
     assert "Nothing has been sent" in r["tell_the_user"]
     assert not gh["issues"]
-    assert pushes == [(OWNER, "Start this build?", "A weekly report", cid)]
+    assert pushes == [(OWNER, "Start this build?", "A weekly report", cid, "build")]   # the alert carries Start build / Not now buttons
     got = card(client, cid)
     assert got["build_ask"]["by_name"] == "Olly" and got["status"] != "In dev for testing" and not got["build_started_at"]
     assert "build_asked_by" not in got

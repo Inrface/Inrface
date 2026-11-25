@@ -248,6 +248,8 @@ CARD_COLUMNS = {
     "shipped_at": "TEXT",           # when it became Done / Live; cleared if it is moved back
     "label": "TEXT NOT NULL DEFAULT ''",  # the team's own name for where it sits, when it isn't the first label for its status
     "build_stage": "TEXT NOT NULL DEFAULT ''",  # the stage of the project's build flow its code has reached
+    "conflict": "TEXT NOT NULL DEFAULT ''",  # "fixing" while the build runner rebases a pull request that can't merge, "stuck" if it couldn't
+    "conflict_mark": "TEXT NOT NULL DEFAULT ''",  # the id of the runner's latest comment about it, so each one is acted on once
     "try_url": "TEXT NOT NULL DEFAULT ''",  # where to try this one once it is live, if not the project's usual address
 }
 

@@ -211,6 +211,7 @@ function missedLine(i) {
   if (i.kind === "build_declined") return who + " held off on building: " + t;
   if (i.kind === "stage") return t + " is now in " + i.detail;
   if (i.kind === "pr") return "Ready for review: " + t;
+  if (i.kind === "conflicts") return i.detail === "fixing" ? "Fixing conflicts: " + t : i.detail === "fixed" ? "Conflicts fixed, ready to test again: " + t : "The agent couldn't fix the conflicts: " + t;
   if (i.kind === "approval_asked") return who + " sent for sign-off: " + t;
   if (i.kind === "approval_done") return "Signed off: " + t;
   if (i.kind === "approval_sent_back") return who + " sent back: " + t;
@@ -550,6 +551,7 @@ function cardRow(c) {
     needs && c.note ? h("p", { class: "ask" }, c.note) : c.summary ? h("p", null, c.summary) : null,
     h("div", { class: "meta" },
       h("span", { class: "chip " + statusClass(c.status) }, c.label || c.status),
+      c.conflict && c.status !== "Done / Live" ? h("span", { class: "chip okwait" }, c.conflict === "fixing" ? "Fixing conflicts" : "Conflicts need a person") : null,
       c.build_ask && receives(c.project_id) ? h("span", { class: "chip okwait" }, "Waiting for your OK") : null,
       c.approval ? h("span", { class: "chip okwait" }, "Awaiting sign-off, level " + c.approval.level + " of " + c.approval.of) : null,
       multiProject() ? h("span", { class: "chip" }, c.project_name) : null,
@@ -685,6 +687,7 @@ function renderDetail() {
       h("h2", null, c.title),
       h("div", { class: "meta" },
         h("span", { class: "chip " + statusClass(c.status) }, c.label || c.status),
+        c.conflict && c.status !== "Done / Live" ? h("span", { class: "chip okwait" }, c.conflict === "fixing" ? "Fixing conflicts" : "Conflicts need a person") : null,
         multiProject() ? h("span", { class: "chip" }, c.project_name) : null,
         c.tool ? h("span", { class: "chip" }, c.tool) : null,
         c.priority ? h("span", { class: "chip" }, c.priority) : null,
@@ -701,6 +704,8 @@ function renderDetail() {
     c.issue_url || (c.links || []).length || c.thread ? h("div", { class: "row links" },
       extLink(c.issue_url, "Issue #" + c.issue_number), extLink(c.pr_url, "Pull request"),
       (c.links || []).filter((l) => l.kind !== "github").map(outLink), c.thread ? outLink(c.thread) : null) : null,
+    c.conflict === "fixing" && c.status !== "Done / Live" ? h("p", { class: "hint" }, "Fixing conflicts. The pull request can't merge into the main branch any more, so the build runner has sent the agent back to rebase it. You'll get an alert when it's ready to test again.") : null,
+    c.conflict === "stuck" && c.status !== "Done / Live" ? h("div", { class: "callout" }, h("h4", null, "Conflicts need a person"), h("p", null, "The agent couldn't resolve the conflicts on its own. Open the pull request and fix them there.")) : null,
     c.build_stage && c.status !== "Done / Live" ? h("p", { class: "hint" }, "Now in " + c.build_stage + ". That is where its code has got to.") : null,
     needs && c.note ? h("div", { class: "callout" },
       h("h4", null, mine ? "You asked" : asker + " asks"),
@@ -727,6 +732,7 @@ const HISTORY = {
   created: () => "added the idea", status: (w) => "moved it to " + w, scoped: () => "updated the scope", build: (w) => "started the build (" + w + ")",
   build_declined: () => "held off on the build", merged: () => "merged an idea into it", unmerged: () => "made it its own idea again",
   code: (w) => "checked the code" + (w ? " (" + w.toLowerCase() + ")" : ""), stage: (w) => "saw its code reach " + w, pr: () => "opened a pull request",
+  conflicts: (w) => w === "fixing" ? "saw the build being sent back to fix conflicts" : w === "fixed" ? "saw the conflicts fixed" : "saw the agent give up on the conflicts",
   comment: () => "commented", answered: () => "answered", build_asked: () => "asked for the build",
   approval_asked: (w) => "sent it for sign-off " + w, approval_signed: (w) => "signed it off, " + w.toLowerCase(), approval_self: (w) => w,
   approval_covered: (w) => "covered a level, " + w.toLowerCase(), approval_done: (w) => w, approval_sent_back: (w) => "sent it back: " + w,
@@ -848,7 +854,7 @@ function connectorsTab(p) {
   return [
     h("p", { class: "hint" }, "Where ideas come in from, and where a build goes to."),
     fold("gh:" + p.id, "GitHub and build flow", g ? (g.repo ? g.repo + (g.token_set ? ", token saved" : ", no token yet") : "not linked yet") : "", [githubForm(p), flowForm(p)]),
-    fold("runner:" + p.id, "Build runner", r ? (r.enabled ? "on, checks every " + plural(r.interval_minutes, "minute") : "off") : "", [runnerForm(p)]),
+    fold("runner:" + p.id, "Build runner", r ? (r.key_set ? (r.enabled ? "on, checks every " + plural(r.interval_minutes, "minute") : "switched off here") + (r.last_seen_at ? ", last checked in " + fmtDate(r.last_seen_at) : "") : "set up on your machine") : "", [runnerForm(p)]),
     fold("conn:" + p.id, "Chat and tracker connectors", c ? (live.length ? live.map((x) => x.name).join(", ") : "none yet") : "", [connectorsForm(p)]),
     fold("keys:" + p.id, "Intake keys", k ? (k.filter((x) => !x.revoked).length ? plural(k.filter((x) => !x.revoked).length, "key") : "none yet") : "", [sourcesForm(p)]),
   ];
@@ -1265,7 +1271,7 @@ function githubForm(p) {
         h("input", { value: val("build_label", g.build_label), autocapitalize: "off", "aria-label": "Build label", oninput: (e) => { state.drafts[k("build_label")] = e.target.value; } })),
       h("label", { class: "stack" }, h("span", null, "Token"),
         h("input", { type: "password", autocomplete: "off", value: val("token", ""), placeholder: g.token_set ? "Leave blank to keep the saved one" : "github_pat_...", "aria-label": "GitHub token", oninput: (e) => { state.drafts[k("token")] = e.target.value; } })),
-      h("p", { class: "hint" }, tokenNote + " Use a fine-grained token for just this repo, with Issues read and write, Pull requests read-only, and Contents read-only."),
+      h("p", { class: "hint" }, tokenNote + " Use a fine-grained token for just this repo, with Contents, Issues and Pull requests all set to Read and write. The build runner uses the same token."),
       h("label", { class: "stack" }, h("span", null, "Who can ask their AI app about the code"),
         h("select", { "aria-label": "Who can ask about the code", onchange: (e) => { state.drafts[k("code_access")] = e.target.value; } },
           [["everyone", "Everyone in the project"], ["receivers", "Only people who review ideas"], ["off", "Nobody"]]
@@ -1358,10 +1364,31 @@ function runnerForm(p) {
   const val = (f, fallback) => k(f) in state.drafts ? state.drafts[k(f)] : fallback;
   if (!r) return h("section", { class: "panel" }, h("h3", null, p.name), h("p", null, "Loading..."));
   const fresh = state.runnerKey && state.runnerKey.project_id === p.id ? state.runnerKey : null;
+  const g = state.github[p.id] || {};
+  const cmd = runnerCommand(g.repo);
   return h("section", { class: "panel", "data-runner": p.id },
     h("h3", null, p.name + ": Build runner"),
-    h("p", null, "A small script on the machine that holds your code can pick up each build issue and hand it to your coding agent, so a build starts without anyone opening a terminal. What it runs, where, and with which tokens is set in a file on that machine, never here. ",
-      h("a", { href: "/docs/build-runner", target: "_blank", rel: "noopener" }, "How to set it up")),
+    h("p", null, "The runner picks up each build and hands it to your coding agent on the machine that holds your code. It pushes the agent's work and opens the pull request itself. It never merges. ",
+      h("a", { href: "/docs/build-runner", target: "_blank", rel: "noopener" }, "Full guide")),
+    h("ol", { class: "steps" },
+      h("li", null, h("strong", null, "One GitHub token. "),
+        "The runner uses the same token as this project. In GitHub, give it ", h("strong", null, "Contents"), ", ", h("strong", null, "Issues"), " and ", h("strong", null, "Pull requests"),
+        ", all set to Read and write. You can change a token's permissions without making a new one.",
+        g.token_set ? null : h("span", { class: "hint" }, " This project has no token yet: add one under GitHub and build flow, above.")),
+      h("li", null, h("strong", null, "Paste this on the machine with your code. "),
+        cmd ? [
+          "It downloads the runner, asks for the token once (nothing shows as you paste it), uses your checkout of " + g.repo + " if you run it inside one or clones it, and starts it in the background.",
+          copyBox(cmd, "Copy command"),
+          h("p", { class: "hint" }, "No internet access from that machine to GitHub's file server? ",
+            h("a", { href: "/runner/inrface_runner.py", download: "inrface_runner.py" }, "Download the script"),
+            ", copy it there, and run ", h("code", null, "python3 inrface_runner.py setup --repo " + g.repo + " && python3 inrface_runner.py install --repo " + g.repo), ".")]
+          : h("span", { class: "hint" }, "Link a GitHub repo under GitHub and build flow, above, and the command appears here.")),
+      h("li", null, h("strong", null, "That's it. "), "Press Start build on an idea and the runner picks it up within five minutes. ",
+        "To watch it: ", h("code", null, "journalctl --user -u " + runnerService(g.repo) + " -f"), ". To stop it: ", h("code", null, "systemctl --user disable --now " + runnerService(g.repo)), ". ",
+        "Each project gets its own runner, so one machine can build several projects.")),
+    h("h4", null, "Optional: switch it on and off from here"),
+    h("p", { class: "hint" }, "Without this the runner works from its own settings on the machine. With a key, the settings below decide whether it runs, how often it checks and how many builds go at once. "
+      + (state.me.sign_in === "access" ? "Cloudflare Access is in front of this app, so the runner also needs an Access service token, or a bypass for /api/runner/v1/config. See the full guide." : "")),
     h("label", { class: "check" },
       h("input", { type: "checkbox", checked: val("enabled", r.enabled), "aria-label": "Runner on", onchange: (e) => { state.drafts[k("enabled")] = e.target.checked; } }),
       " Switched on. When this is off, the script checks in and does nothing."),
@@ -1382,6 +1409,26 @@ function runnerForm(p) {
     h("div", { class: "row" },
       h("button", { class: "quiet", disabled: state.busy, onclick: () => makeRunnerKey(p.id) }, r.key_set ? "Make a new key" : "Make a key"),
       r.key_set ? h("button", { class: "link", disabled: state.busy, onclick: () => dropRunnerKey(p.id) }, "Remove key") : null));
+}
+
+// One line that downloads the runner, sets it up for the repo and keeps it running.
+function runnerCommand(repo) {
+  if (!repo) return "";
+  const f = "~/.local/share/inrface-runner/inrface_runner.py";
+  return "mkdir -p ~/.local/share/inrface-runner && curl -fsSL https://raw.githubusercontent.com/Inrface/Inrface/main/runner/inrface_runner.py -o " + f
+    + " && python3 " + f + " setup --repo " + repo + " && python3 " + f + " install --repo " + repo;
+}
+
+// The systemd service the runner for this repo runs as (the same name the script gives it).
+function runnerService(repo) {
+  const name = String(repo || "").split("/").pop().toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
+  return "inrface-runner-" + (name || "repo");
+}
+
+function copyBox(text, label) {
+  return h("div", { class: "copybox" },
+    h("code", { class: "key" }, text),
+    h("button", { class: "primary", onclick: () => navigator.clipboard.writeText(text).then(() => toast("Copied. Paste it in a terminal on that machine."), () => toast("Couldn't copy. Select it instead.")) }, label || "Copy"));
 }
 
 function saveRunner(id, k) {

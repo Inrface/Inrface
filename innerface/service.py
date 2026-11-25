@@ -71,10 +71,10 @@ def _submit(fn, *args) -> bool:
     return True
 
 
-def notify(s: Settings, emails, title: str, body: str, card_id: str | None = None) -> None:
+def notify(s: Settings, emails, title: str, body: str, card_id: str | None = None, ask: str | None = None) -> None:
     """Best effort, off the request path. A failed alert must never break the action that caused it."""
     for e in dict.fromkeys(emails):
-        _submit(push.send, s, e, title, body, card_id)
+        _submit(push.send, s, e, title, body, card_id, *([ask] if ask else []))
 
 
 def _others(project: Project, *emails: str, exclude: str) -> list[str]:
@@ -1216,6 +1216,16 @@ def sync_builds(s: Settings) -> int:
                 log_activity(c, card, project.id, "github", "pr", "A pull request is ready for review")
                 notify(s, project.receivers, "Ready for review", card["title"], card["id"])
                 changed += 1
+            said = p.get("conflicts")
+            if said and not done and said["id"] != card["conflict_mark"]:
+                # The build runner is rebasing the pull request (fixing), has finished (fixed) or couldn't (stuck).
+                touch(c, card["id"], conflict=said["kind"] if said["kind"] != "fixed" else "", conflict_mark=said["id"])
+                log_activity(c, card, project.id, "github", "conflicts", said["kind"])
+                if said["kind"] == "fixed":
+                    notify(s, project.receivers, "Ready to test again", f"{card['title']}: the conflicts are fixed.", card["id"])
+                elif said["kind"] == "stuck":
+                    notify(s, project.receivers, "Needs a person", f"{card['title']}: the agent couldn't fix the conflicts.", card["id"])
+                changed += 1
             if stage and stage != card["build_stage"]:
                 touch(c, card["id"], build_stage=stage)
                 log_activity(c, card, project.id, "github", "stage", stage)
@@ -1223,7 +1233,7 @@ def sync_builds(s: Settings) -> int:
                     notify(s, _others(project, *_authors(card), exclude=""), "Moving along", f"{card['title']}: now in {stage}", card["id"])
                 changed += 1
             if done:
-                touch(c, card["id"], status="Done / Live")
+                touch(c, card["id"], status="Done / Live", conflict="")
                 log_activity(c, card, project.id, "github", "status", "Done / Live")
                 changed += 1
         if done:  # after the write is saved, so neither the alerts nor the thread post wait on it

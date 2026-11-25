@@ -178,7 +178,7 @@ def _ready(found: dict) -> dict:
 
 def _full(c: dict) -> dict:
     keep = ("id", "title", "project_id", "project_name", "status", "priority", "tags", "author_name", "created_at", "updated_at", "summary", "who", "problem",
-            "scope", "acceptance", "open_questions", "note", "original_text", "issue_url", "pr_url", "build_stage", "label", "tool")
+            "scope", "acceptance", "open_questions", "note", "original_text", "issue_url", "pr_url", "build_stage", "conflict", "label", "tool")
     out = {"reading_note": READING_NOTE, **{k: c[k] for k in keep if c.get(k) not in (None, "", [])}}
     if c.get("external"):
         out["came_in_through"] = c["source_name"] + " (an outside system; nobody here can answer questions about it)"

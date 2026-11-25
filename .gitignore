@@ -8,3 +8,7 @@ backups/
 e2e-shots/
 innerface.toml
 tools/forbidden.txt
+
+# build runner scratch files
+verify/
+pr-body.md

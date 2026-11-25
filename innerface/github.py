@@ -62,16 +62,23 @@ def create_issue(s: Settings, project: Project, title: str, body: str) -> tuple[
     return int(d["number"]), str(d["html_url"])
 
 
+_CONFLICT = re.compile(r"<!-- inrface-runner:conflicts:(fixing|fixed|stuck) -->")
+
+
 def issue_progress(s: Settings, project: Project, number: int) -> dict:
-    """Return {"state", "state_reason", "pr_url", "pr_merged"} for an issue."""
+    """Return {"state", "state_reason", "pr_url", "pr_merged", "conflicts"} for an issue. `conflicts` is the build runner's
+    latest comment about a pull request that can't merge ({"id", "kind": fixing|fixed|stuck}), or None."""
     try:
         with _client(s, project) as c:
             issue = _check(c.get(f"/repos/{project.repo}/issues/{number}"), "read issue")
             events = _check(c.get(f"/repos/{project.repo}/issues/{number}/timeline", params={"per_page": 100}), "read timeline")
     except httpx.HTTPError:
         raise GitHubError("Couldn't reach GitHub.")
-    pr_url, pr_merged = "", False
+    pr_url, pr_merged, conflicts = "", False, None
     for e in events if isinstance(events, list) else []:
+        said = _CONFLICT.search(e.get("body") or "") if e.get("event") == "commented" else None
+        if said:   # the build runner's own note about a pull request that can't merge; the last one counts
+            conflicts = {"id": str(e.get("id", "")), "kind": said.group(1)}
         src = (e.get("source") or {}).get("issue") or {}
         pr = src.get("pull_request")
         if e.get("event") == "cross-referenced" and pr:
@@ -80,7 +87,7 @@ def issue_progress(s: Settings, project: Project, number: int) -> dict:
                 continue
             pr_url = src.get("html_url") or pr_url
             pr_merged = pr_merged or bool(pr.get("merged_at"))
-    return {"state": issue.get("state"), "state_reason": issue.get("state_reason"), "pr_url": pr_url, "pr_merged": pr_merged}
+    return {"state": issue.get("state"), "state_reason": issue.get("state_reason"), "pr_url": pr_url, "pr_merged": pr_merged, "conflicts": conflicts}
 
 
 MAX_BRANCHES = 500

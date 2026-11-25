@@ -59,7 +59,7 @@ def pushes(monkeypatch):
     sent = []
     from innerface import push, service
     monkeypatch.setattr(service, "_submit", lambda fn, *a: fn(*a))
-    monkeypatch.setattr(push, "send", lambda s, email, title, body, card_id=None: sent.append((email, title, body, card_id)))
+    monkeypatch.setattr(push, "send", lambda s, email, title, body, card_id=None, ask=None: sent.append((email, title, body, card_id) + ((ask,) if ask else ())))
     return sent
 
 
@@ -339,7 +339,29 @@ def test_github_progress_ignores_prs_from_other_repos(monkeypatch):
 
     monkeypatch.setattr(github.httpx, "Client", FakeClient)
     s = type("S", (), {"github_api": "https://api.github.com"})()
-    assert github.issue_progress(s, project, 1) == {"state": "open", "state_reason": None, "pr_url": "", "pr_merged": False}
+    assert github.issue_progress(s, project, 1) == {"state": "open", "state_reason": None, "pr_url": "", "pr_merged": False, "conflicts": None}
+
+
+def test_the_runners_notes_about_conflicts_are_read_from_the_timeline_and_the_last_one_counts(monkeypatch):
+    from innerface import config, github
+    project = config.Project(id="p", name="P", givers=(), receivers=("a@x",), repo="acme/app", github_token_env="T")
+    monkeypatch.setenv("T", "tok")
+    events = [{"event": "commented", "id": 1, "body": "Build started"},
+              {"event": "commented", "id": 2, "body": "Sending the agent back.\n\n<!-- inrface-runner:conflicts:fixing -->"},
+              {"event": "commented", "id": 3, "body": "Fixed.\n\n<!-- inrface-runner:conflicts:fixed -->"},
+              {"event": "labeled", "id": 4, "body": "<!-- inrface-runner:conflicts:stuck -->"}]
+
+    class FakeClient:
+        def __init__(self, *a, **k): pass
+        def __enter__(self): return self
+        def __exit__(self, *a): pass
+        def get(self, path, params=None):
+            import httpx
+            return httpx.Response(200, json=events if path.endswith("/timeline") else {"state": "open", "state_reason": None})
+
+    monkeypatch.setattr(github.httpx, "Client", FakeClient)
+    s = type("S", (), {"github_api": "https://api.github.com"})()
+    assert github.issue_progress(s, project, 1)["conflicts"] == {"id": "3", "kind": "fixed"}
 
 
 # ----- MCP -----
@@ -460,7 +482,10 @@ def test_push_sends_real_vapid_and_drops_dead_subscriptions(client, monkeypatch)
         raise push.WebPushException("gone", response=Resp())
     monkeypatch.setattr(push, "webpush", fake_webpush)
     push.send(s, OWNER, "T", "B", "card1")
-    assert json.loads(calls[0]["data"])["cardId"] == "card1"
+    assert json.loads(calls[0]["data"])["cardId"] == "card1" and json.loads(calls[0]["data"])["ask"] is None
+    client.post("/api/push/subscribe", json={"endpoint": "https://web.push.apple.com/abc", "p256dh": "x", "auth": "y"}, headers=AS_O)
+    push.send(s, OWNER, "T", "B", "card1", "build")
+    assert json.loads(calls[-1]["data"])["ask"] == "build"
     from innerface import db
     with db.connect(s) as c:
         assert c.execute("SELECT COUNT(*) FROM push_subscriptions").fetchone()[0] == 0

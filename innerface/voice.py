@@ -61,7 +61,7 @@ def ask(s: Settings, user: dict, card_id: str, said: str = "") -> dict:
             c.execute("UPDATE cards SET build_asked_at=?, build_asked_by=? WHERE id=? AND build_started_at IS NULL", (db.now(), user["email"], card["id"]))
             if not again:
                 service.log_activity(c, card, project.id, user["email"], "build_asked", "")
-        service.notify(s, [user["email"]], "Start this build?", card["title"], card["id"])
+        service.notify(s, [user["email"]], "Start this build?", card["title"], card["id"], "build")
     say = "Nothing has been sent yet. The build starts when they press Start build on this idea in the Inrface app. "
     say += "An alert that opens the idea is on its way to their phone." if _has_alerts(s, user["email"]) else "They don't have alerts switched on, so they need to open Inrface themselves."
     if heard == "wrong":

@@ -91,7 +91,7 @@ Cloudflare suggests a short access token lifetime (5 to 15 minutes) and a longer
 
 Edit `innerface.toml`. Each person needs the email address they sign in to Cloudflare with, written the same way. Each project lists who gives ideas and who receives them.
 
-A project that builds through GitHub also names a repo. For each one, create a fine-grained GitHub token limited to that repo, with **Issues** read and write, **Pull requests** read and **Contents** read. Contents is what lets people ask their AI app about the code; leave it off if you don't want that. Put it in `.env` under the name the project gives in `github_token_env`. You can leave the repo out and add it later from the Settings screen.
+A project that builds through GitHub also names a repo. For each one, create a fine-grained GitHub token limited to that repo, with **Contents**, **Issues** and **Pull requests** all set to **Read and write**. The [build runner](/docs/build-runner) uses the same token, so one token covers both. Put it in `.env` under the name the project gives in `github_token_env`. You can leave the repo out and add it later from the Settings screen.
 
 The file only has to name the first receiver and one project. Once the app is running, a receiver adds the other people under **Settings → People**, and more projects under **Settings → New project**. Each person added there also needs their address in the Access policy from step 3.
 

@@ -142,6 +142,17 @@ DOC_PAGES = ("install", "sign-in", "intake-api", "connectors", "webhook", "linea
 _docs_cache: dict[str, str] = {}
 
 
+RUNNER_FILE = Path(__file__).resolve().parent.parent / "runner" / "inrface_runner.py"
+
+
+@app.get("/runner/inrface_runner.py")
+def runner_script(user: dict = Depends(current_user)):
+    """The build runner, for the Build runner panel's download link. Signed-in people only, like the docs."""
+    if not RUNNER_FILE.exists():
+        raise HTTPException(404, "The runner isn't in this install")
+    return FileResponse(RUNNER_FILE, media_type="text/x-python", filename="inrface_runner.py")
+
+
 @app.get("/docs/{name}", response_class=HTMLResponse)
 def docs_page(name: str, user: dict = Depends(current_user)):
     if name not in DOC_PAGES:

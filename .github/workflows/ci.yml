@@ -44,6 +44,7 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.base.ref == 'main' &&
       !github.event.pull_request.draft &&
+      !startsWith(github.event.pull_request.head.ref, 'inrface/') &&
       !contains(github.event.pull_request.labels.*.name, 'hold')
     runs-on: ubuntu-latest
     permissions:

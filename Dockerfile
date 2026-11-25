@@ -8,6 +8,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt && useradd --uid 10001 --no-create-home app && mkdir /data && chown app /data
 COPY innerface ./innerface
 COPY docs ./docs
+COPY runner/inrface_runner.py ./runner/inrface_runner.py
 USER app
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD python -c "import urllib.request as u; u.urlopen('http://127.0.0.1:8080/healthz', timeout=4)"

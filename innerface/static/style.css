@@ -247,3 +247,10 @@ ul.gaps small { color: var(--muted); font-size: 13px; }
 .fold[open] > summary::after { content: "\2304"; }
 .foldnote { display: block; font-weight: 400; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
 .fold > .panel { border: 0; border-radius: 0; margin: 0; background: none; }
+
+/* Build runner setup: numbered steps and a command with a copy button. */
+ol.steps { padding-left: 22px; display: grid; gap: 14px; margin: 12px 0 18px; }
+ol.steps li { line-height: 1.5; }
+.copybox { display: grid; gap: 8px; margin: 8px 0 4px; }
+.copybox code.key { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.copybox button { justify-self: start; }

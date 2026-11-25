@@ -97,8 +97,10 @@ def public_key(s: Settings) -> str:
     return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
 
 
-def send(s: Settings, email: str, title: str, body: str, card_id: str | None = None) -> None:
-    """Best effort. A failed alert must never break the action that caused it."""
+def send(s: Settings, email: str, title: str, body: str, card_id: str | None = None, ask: str | None = None) -> None:
+    """Best effort. A failed alert must never break the action that caused it. `ask="build"` adds Start build and
+    Not now buttons to the alert; pressing one makes the same request the app's own buttons make, so the server
+    still checks who is asking."""
     if not s.push_contact:
         log.info("push skipped: PUSH_CONTACT not set")
         return
@@ -113,7 +115,7 @@ def send(s: Settings, email: str, title: str, body: str, card_id: str | None = N
         return
     _ensure_key(s)
     vapid = Vapid02.from_file(str(_keyfile(s)))
-    data = json.dumps({"title": title, "body": body[:180], "cardId": card_id})
+    data = json.dumps({"title": title, "body": body[:180], "cardId": card_id, "ask": ask})
     session = _NoRedirects()
     for sub in subs:
         try:

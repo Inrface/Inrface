@@ -32,7 +32,7 @@ You need Docker on an always-on machine (a Proxmox VM works well), and a domain 
 2. **Access:** Zero Trust > Access > Applications > add a self-hosted application for that hostname. Add Google as a login method and allow only the people in your config. Set the session length to the longest you're comfortable with, since the phone app has to sign in again when it expires. Copy the Application Audience (AUD) tag.
 3. **MCP sign-in:** on the same application, open Advanced settings and turn on **Managed OAuth**, with dynamic client registration allowed. This lets AI apps sign in through Access. Cloudflare suggests a short access token lifetime (5 to 15 minutes) and a longer grant session (1 to 2 weeks).
 4. **People and projects:** copy `innerface.example.toml` to `innerface.toml` and fill it in.
-5. **Secrets:** copy `.env.example` to `.env`, fill it in, and run `chmod 600 .env`. For each project with a repo, create a fine-grained GitHub token limited to that repo, with Issues read and write, Pull requests read and Contents read.
+5. **Secrets:** copy `.env.example` to `.env`, fill it in, and run `chmod 600 .env`. For each project with a repo, create a fine-grained GitHub token limited to that repo, with Contents, Issues and Pull requests all set to Read and write. The build runner uses the same token.
 6. **Check and start:** `docker compose pull` fetches the ready-made image (or build your own with `docker compose build`). `docker compose run --rm app python -m innerface.check` reads your settings and says in plain words what is missing or wrong. Then `docker compose up -d`. It restarts on its own after a reboot.
 7. **Phones:** open the address, then Share > Add to Home Screen. Open it from the home screen and tap Turn on alerts on the Ideas tab. Alerts need iOS 16.4 or later.
 8. **AI app:** each person adds a custom connector in their own AI app with the URL `https://<your hostname>/mcp`, and signs in when asked. If a login is refused, the server's log says why (`docker compose logs app`).
@@ -160,7 +160,7 @@ By default a card is done when its GitHub issue closes with the pull request mer
 
 ## Starting builds automatically
 
-A small script, `runner/inrface_runner.py`, can run on the machine that holds your code and pick up each build issue Inrface opens, handing it to your coding agent on its own branch. It's one file with nothing to install. You set when it checks, and switch it on, under **Settings → Connectors → Build runner**. What it runs and which tokens it uses stays in a file on that machine, never in Inrface. It never merges or deploys. Setup is in [docs/build-runner.md](docs/build-runner.md). A guide written for a coding agent to set it up on your behalf is [docs/build-runner-agent-setup.md](docs/build-runner-agent-setup.md).
+A small script, `runner/inrface_runner.py`, runs on the machine that holds your code and picks up each build issue Inrface opens. It hands the issue to your coding agent on its own branch, then pushes the branch and opens the pull request itself. It's one file with nothing to install, and it uses the same GitHub token as Inrface. Setup is two commands in your checkout: `python3 runner/inrface_runner.py setup`, then `python3 runner/inrface_runner.py install`. One machine can run a runner for each of several projects. It never merges or deploys. Setup is in [docs/build-runner.md](docs/build-runner.md). A guide written for a coding agent to set it up on your behalf is [docs/build-runner-agent-setup.md](docs/build-runner-agent-setup.md).
 
 ## Ideas from Slack
 
